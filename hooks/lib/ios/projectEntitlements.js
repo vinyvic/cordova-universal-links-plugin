@@ -11,6 +11,7 @@ var fs = require('fs');
 var plist = require('plist');
 var mkpath = require('mkpath');
 var ConfigXmlHelper = require('../configXmlHelper.js');
+var platformLayout = require('./platformLayout.js');
 var ASSOCIATED_DOMAINS = 'com.apple.developer.associated-domains';
 var context;
 var projectRoot;
@@ -32,10 +33,41 @@ module.exports = {
 function generateEntitlements(cordovaContext, pluginPreferences) {
   context = cordovaContext;
 
+  if (platformLayout.usesAppTemplate(getProjectRoot())) {
+    mergeIntoAppTemplateEntitlements(pluginPreferences);
+    return;
+  }
+
   var currentEntitlements = getEntitlementsFileContent();
   var newEntitlements = injectPreferences(currentEntitlements, pluginPreferences);
 
   saveContentToEntitlementsFile(newEntitlements);
+}
+
+/**
+ * cordova-ios 8+: the app target already points CODE_SIGN_ENTITLEMENTS at
+ * App/Entitlements-$(CONFIGURATION).plist. Merge our applinks entries into those files,
+ * keeping any other keys and any non-applinks associated domains (e.g. webcredentials:).
+ *
+ * @param {Object} pluginPreferences - plugin preferences from config.xml; already parsed
+ */
+function mergeIntoAppTemplateEntitlements(pluginPreferences) {
+  var applinks = generateAssociatedDomainsContent(pluginPreferences);
+
+  platformLayout.appTemplateEntitlementsFiles(getProjectRoot()).forEach(function(filePath) {
+    if (!fs.existsSync(filePath)) {
+      console.warn('Universal Links: entitlements file not found, skipping: ' + filePath);
+      return;
+    }
+
+    var entitlements = plist.parse(fs.readFileSync(filePath, 'utf8')) || {};
+    var otherDomains = (entitlements[ASSOCIATED_DOMAINS] || []).filter(function(entry) {
+      return entry.indexOf('applinks:') !== 0;
+    });
+
+    entitlements[ASSOCIATED_DOMAINS] = applinks.concat(otherDomains);
+    fs.writeFileSync(filePath, plist.build(entitlements), 'utf8');
+  });
 }
 
 // endregion

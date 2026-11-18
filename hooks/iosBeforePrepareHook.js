@@ -7,6 +7,7 @@ If file name has no changed - hook will do nothing.
 var path = require('path');
 var fs = require('fs');
 var ConfigXmlHelper = require('./lib/configXmlHelper.js');
+var platformLayout = require('./lib/ios/platformLayout.js');
 
 module.exports = function(ctx) {
   run(ctx);
@@ -19,6 +20,12 @@ module.exports = function(ctx) {
  */
 function run(ctx) {
   var projectRoot = ctx.opts.projectRoot;
+
+  // cordova-ios 8+ always names the project "App"; there is no project-named entitlements file to rename.
+  if (platformLayout.usesAppTemplate(projectRoot)) {
+    return;
+  }
+
   var iosProjectFilePath = path.join(projectRoot, 'platforms', 'ios');
   var configXmlHelper = new ConfigXmlHelper(ctx);
   var newProjectName = configXmlHelper.getProjectName();

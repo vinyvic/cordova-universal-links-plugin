@@ -26,6 +26,15 @@
 
 - (void)pluginInitialize {
     [self localInit];
+
+    // cordova-ios 8+ is scene based: UIKit no longer calls the AppDelegate's
+    // application:continueUserActivity:restorationHandler:. CDVSceneDelegate posts this
+    // notification instead (also replayed after page load on a cold launch).
+    // Older cordova-ios versions never post it, so the AppDelegate category keeps working there.
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleContinueUserActivityNotification:)
+                                                 name:@"CDVPluginContinueUserActivityNotification"
+                                               object:nil];
     // Can be used for testing.
     // Just uncomment, close the app and reopen it. That will simulate application launch from the link.
 //    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onResume:) name:UIApplicationWillEnterForegroundNotification object:nil];
@@ -48,6 +57,21 @@
     if (host) {
         [self storeEventWithHost:host originalURL:url];
     }
+}
+
+- (void)handleContinueUserActivityNotification:(NSNotification *)notification {
+    id userActivity = notification.object;
+    if (![userActivity isKindOfClass:[NSUserActivity class]]) {
+        return;
+    }
+
+    // ignore activities that are not for Universal Links
+    NSUserActivity *activity = (NSUserActivity *)userActivity;
+    if (![activity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb] || activity.webpageURL == nil) {
+        return;
+    }
+
+    [self handleUserActivity:activity];
 }
 
 - (BOOL)handleUserActivity:(NSUserActivity *)userActivity {

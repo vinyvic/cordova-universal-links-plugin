@@ -9,6 +9,7 @@ Which is:
 var path = require('path');
 var compare = require('node-version-compare');
 var ConfigXmlHelper = require('../configXmlHelper.js');
+var platformLayout = require('./platformLayout.js');
 var IOS_DEPLOYMENT_TARGET = '8.0';
 var COMMENT_KEY = /_comment$/;
 var context;
@@ -26,6 +27,12 @@ module.exports = {
  */
 function enableAssociativeDomainsCapability(cordovaContext) {
   context = cordovaContext;
+
+  // cordova-ios 8+ already wires App/Entitlements-$(CONFIGURATION).plist into
+  // CODE_SIGN_ENTITLEMENTS and sets a supported deployment target.
+  if (platformLayout.usesAppTemplate(projectRoot())) {
+    return;
+  }
 
   var projectFile = loadProjectFile();
 
